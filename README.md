@@ -1,18 +1,31 @@
 # remote-control-agent
 
+- user log in with google account in desktop side
+- user log in with same google account in mobile or web
+
+then pairing should be easy
+
 # 🚀 Universal Coding Agent Web UI & Local Bridge Architecture
 
-본 문서는 사용자의 로컬 컴퓨터에서 실행되는 Google Antigravity, Open Interpreter 등 다양한 코딩 에이전트 프로세스를 안전하게 웹 브라우저 챗 인터페이스와 연결하고 제어하기 위한 범용적인 테크 스택 및 아키텍처 명세서입니다.
+본 문서는 사용자의 로컬 컴퓨터에서 실행되는 Google Antigravity, Open Interpreter 등 다양한 코딩 에이전트 프로세스를 안전하게 웹 브라우저 챗 인터페이스를 통해 원격 제어하기 위한 **엔드-투-엔드 아키텍처**입니다.
 
 ---
 
 ## 1. 시스템 아키텍처 개요 (System Architecture)
 
-시스템은 UI 파트와 실행 파트를 철저하게 분리하는 **3티어 어댑터 아키텍처(Three-Tier Adapter Architecture)**를 채택하여, 향후 어떤 새로운 코딩 에이전트(CLI/API)가 추가되더라도 프론트엔드 수정 없이 확장할 수 있도록 설계합니다.
+시스템은 UI 파트와 실행 파트를 철저하게 분리하는 **3티어 어댑터 아키텍처(Three-Tier Adapter Architecture)**를 채택하여, 향후 어떤 새로운 코딩 에이전트가 추가되어도 프론트엔드와 브릿지 코드의 변경을 최소화합니다.
 
 
-[ Frontend Web UI ] (Vite / Next.js 기반 챗 화면)││ (Secure WebSockets / JSON-RPC 2.0 / MCP 통신)▼[ Remote/Cloud Orchestrator ] (사용자 인증 및 에이전트 라우팅 레이어)││ (E2EE 암호화 터널: Cloudflare Tunnels / Ngrok)▼[ Local Bridge Daemon ] (유저 PC 내 백그라운드 서버 - FastAPI / Node.js)││ (OS Process Spawning: stdin / stdout 스트림 캡처)▼[ Coding Agents Runtime ] (Antigravity, Open Interpreter, Aider 등)
-
+[ Frontend Web UI ] (Vite / Next.js 기반 챗 화면)
+││ (Secure WebSockets / JSON-RPC 2.0 / MCP 통신)
+▼
+[ Remote/Cloud Orchestrator ] (사용자 인증 및 에이전트 라우팅 레이어)
+││ (Cloudflare Tunnels / Ngrok을 통한 E2EE 터널링)
+▼
+[ Local Bridge Layer ] (사용자의 데스크톱 백그라운드 서비스)
+││ (CLI 인터페이스 추상화 및 프로세스 관리)
+▼
+[ Coding Agents Runtime ] (Google Antigravity, Open Interpreter, etc.)
 
 
 ---
@@ -59,7 +72,7 @@
 * **환경 및 패키지 관리:** `uv` (Python 환경인 경우)
   * 에이전트별로 독립된 가상환경을 매우 빠른 속도로 빌드하고 관리하기 위해 필수적입니다.
 * **프로세스 매니저:** Python의 `subprocess` / `asyncio.create_subprocess_exec` 또는 Node.js의 `child_process`
-  * Antigravity나 여타 에이전트의 CLI 명령어(예: `antigravity run`)를 백그라운드 자식 프로세스로 실행하고, `stdin`(입력)과 `stdout/stderr`(출력)을 실시간으로 가로채(Hooking) 웹으로 스트리밍하는 핵심 역할을 수행합니다.
+  * Antigravity나 여타 에이전트의 CLI 명령어(예: `antigravity run`)를 백그라운드 자식 프로세스로 실행하고, `stdin`(입력)과 `stdout/stderr`(출력)을 실시간으로 캡처합니다.
 
 ---
 
@@ -70,7 +83,7 @@
    * 로컬 브릿지는 모든 코딩 에이전트를 하나의 **"입출력이 가능한 블랙박스 CLI 프로그램"**으로 취급해야 합니다.
 2. **출력 어댑터 패턴 (Output Adapter Pattern) 적용**
    * 에이전트들마다 로그를 출력하는 형태(텍스트, JSON, 마크다운 믹스 등)가 다릅니다.
-   * 로컬 브릿지 단에서 각 에이전트별 정규식(Regex) 파서를 플러그인 형태로 구성하여, 프론트엔드로 쏠 때는 항상 일관된 스키마(`{"status": "executing_code", "data": "..."}`)로 정제해 송신합니다.
+   * 로컬 브릿지 단에서 각 에이전트별 정규식(Regex) 파서를 플러그인 형태로 구성하여, 프론트엔드로 쏠 때는 항상 일관된 스키마(`{"status": "executing", "log": "..."}` 등)로 정규화합니다.
 3. **보안 가드레일 (Security Guardrails)**
    * 유저 로컬 권한을 웹에 넘겨주는 구조이므로 웹 브라우저에서 보낸 모든 요청 핸들샤이닝 단계에서 암호화 토큰 키 검증이 의무화되어야 합니다.
 
